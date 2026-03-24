@@ -1,0 +1,13 @@
+# 虚拟环境
+.venv/
+venv/
+
+# PyCharm 缓存
+.idea/
+
+# Python 编译文件
+__pycache__/
+*.pyc
+
+# 忽略大型数据文件（视你们团队规定而定，比如之前的 csv）
+*.csv
