@@ -11,3 +11,7 @@ __pycache__/
 
 # 忽略大型数据文件（视你们团队规定而定，比如之前的 csv）
 *.csv
+#忽略其他人的代码
+backend/
+
+readme.md

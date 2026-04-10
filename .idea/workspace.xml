@@ -5,12 +5,19 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4bffce18-5f6d-475d-86ff-3aed1364b164" name="更改" comment="">
-      <change afterPath="$PROJECT_DIR$/app/models/project.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/models/user.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/routers/lessonprep.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/routers/parser.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/llm_client.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/pdf_parser.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/ppt_generator.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/utils/minio_client.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/readme.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.env" beforeDir="false" afterPath="$PROJECT_DIR$/.env" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/routers/lessonprep.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/routers/lessonprep.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backend/rag/rag_engine.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/rag/rag_engine.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -43,7 +50,9 @@
     &quot;ASKED_MARK_IGNORED_FILES_AS_EXCLUDED&quot;: &quot;true&quot;,
     &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
     &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.llm_client.executor&quot;: &quot;Run&quot;,
     &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.ppt_generator.executor&quot;: &quot;Run&quot;,
     &quot;Python.user.executor&quot;: &quot;Run&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,

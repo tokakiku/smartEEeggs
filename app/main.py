@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from passlib.context import CryptContext
 import traceback
+from app.routers import lessonprep, parser
 import jwt
 from datetime import datetime, timedelta
 from app.routers import lessonprep
@@ -203,3 +204,4 @@ def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
     }
 
 app.include_router(lessonprep.router)
+app.include_router(parser.router)
