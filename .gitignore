@@ -13,5 +13,6 @@ __pycache__/
 *.csv
 #忽略其他人的代码
 backend/
-
+downloads/
 readme.md
+.env
