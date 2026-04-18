@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>互动游戏：情景大闯关</title>
+    <style>
+        body { font-family: 'Microsoft YaHei', sans-serif; display: flex; flex-direction: column; align-items: center; background: #ebf8ff; padding: 50px; }
+        .quiz-container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 15px rgba(0,0,0,0.1); max-width: 600px; width: 100%; text-align: center; }
+        .scenario { font-size: 20px; font-weight: bold; margin-bottom: 20px; color: #2d3748; }
+        .options { display: flex; flex-direction: column; gap: 10px; }
+        .btn { padding: 15px; border: 2px solid #4299e1; background: white; color: #4299e1; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: all 0.2s; }
+        .btn:hover { background: #4299e1; color: white; }
+        .btn.correct { background: #48bb78; border-color: #48bb78; color: white; }
+        .btn.wrong { background: #f56565; border-color: #f56565; color: white; }
+        #feedback { margin-top: 20px; font-size: 18px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="quiz-container">
+        <h1>🚀 情景大闯关</h1>
+        <div id="quiz-content"></div>
+        <div id="feedback"></div>
+    </div>
+
+    <script>
+        // 🚨 Python 注入占位符
+        const GAME_DATA = /*INJECT_DATA*/;
+        let currentIndex = 0;
+
+        function loadQuestion() {
+            if (currentIndex >= GAME_DATA.questions.length) {
+                document.getElementById('quiz-content').innerHTML = "<h2>🎉 恭喜通关！你已掌握全部核心逻辑！</h2>";
+                return;
+            }
+            const q = GAME_DATA.questions[currentIndex];
+            let html = `<div class="scenario">${q.scenario}</div><div class="options">`;
+            q.options.forEach((opt, i) => {
+                html += `<button class="btn" onclick="checkAnswer(${i}, ${q.correct_index})">${opt}</button>`;
+            });
+            html += `</div>`;
+            document.getElementById('quiz-content').innerHTML = html;
+            document.getElementById('feedback').innerText = "";
+        }
+
+        function checkAnswer(selectedIndex, correctIndex) {
+            const btns = document.querySelectorAll('.btn');
+            if (selectedIndex === correctIndex) {
+                btns[selectedIndex].classList.add('correct');
+                document.getElementById('feedback').style.color = "#48bb78";
+                document.getElementById('feedback').innerText = "✅ 回答正确！进入下一关...";
+                setTimeout(() => { currentIndex++; loadQuestion(); }, 1500);
+            } else {
+                btns[selectedIndex].classList.add('wrong');
+                document.getElementById('feedback').style.color = "#f56565";
+                document.getElementById('feedback').innerText = "❌ 哎呀，选错了，再想想？";
+            }
+        }
+
+        loadQuestion();
+    </script>
+</body>
+</html>

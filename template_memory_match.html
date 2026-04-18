@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>互动游戏：知识消消乐</title>
+    <style>
+        body { font-family: 'Microsoft YaHei', sans-serif; display: flex; flex-direction: column; align-items: center; background: #f0f4f8; }
+        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 20px; }
+        .card { width: 150px; height: 100px; background: #fff; border-radius: 10px; display: flex; justify-content: center; align-items: center; text-align: center; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.3s, background 0.3s; padding: 10px; font-size: 14px; font-weight: bold; }
+        .card.flipped { background: #4299e1; color: white; transform: scale(1.05); }
+        .card.matched { background: #48bb78; color: white; cursor: default; opacity: 0.8; }
+        #message { margin-top: 20px; font-size: 24px; color: #e53e3e; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🧠 知识消消乐</h1>
+    <p>点击翻开两张卡片，找出匹配的概念与解释！</p>
+    <div class="grid" id="gameGrid"></div>
+    <div id="message"></div>
+
+    <script>
+        // 🚨 这里的 GAME_DATA 只是占位符，实际运行时会被 Python 后端替换！
+        const GAME_DATA = /*INJECT_DATA*/;
+
+        let cards = [];
+        let flippedCards = [];
+        let matchedCount = 0;
+
+        // 初始化游戏
+        function initGame() {
+            const grid = document.getElementById('gameGrid');
+            // 将 left 和 right 拆开并打乱
+            GAME_DATA.pairs.forEach((pair, index) => {
+                cards.push({ id: index, text: pair.left, type: 'left' });
+                cards.push({ id: index, text: pair.right, type: 'right' });
+            });
+            cards.sort(() => Math.random() - 0.5); // 洗牌
+
+            cards.forEach((card, index) => {
+                const el = document.createElement('div');
+                el.className = 'card';
+                el.innerText = "❓"; // 初始状态背面
+                el.onclick = () => flipCard(el, card, index);
+                grid.appendChild(el);
+            });
+        }
+
+        function flipCard(el, card, index) {
+            if (el.classList.contains('flipped') || el.classList.contains('matched') || flippedCards.length >= 2) return;
+
+            el.innerText = card.text;
+            el.classList.add('flipped');
+            flippedCards.push({ el, card });
+
+            if (flippedCards.length === 2) {
+                checkMatch();
+            }
+        }
+
+        function checkMatch() {
+            const [c1, c2] = flippedCards;
+            if (c1.card.id === c2.card.id && c1.card.type !== c2.card.type) {
+                // 匹配成功
+                setTimeout(() => {
+                    c1.el.classList.replace('flipped', 'matched');
+                    c2.el.classList.replace('flipped', 'matched');
+                    matchedCount += 2;
+                    flippedCards = [];
+                    if (matchedCount === cards.length) document.getElementById('message').innerText = "🎉 挑战成功！知识点全部掌握！";
+                }, 500);
+            } else {
+                // 匹配失败
+                setTimeout(() => {
+                    c1.el.innerText = "❓"; c1.el.classList.remove('flipped');
+                    c2.el.innerText = "❓"; c2.el.classList.remove('flipped');
+                    flippedCards = [];
+                }, 1000);
+            }
+        }
+
+        initGame();
+    </script>
+</body>
+</html>

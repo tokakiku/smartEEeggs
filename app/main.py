@@ -1,35 +1,23 @@
-# ==========================================
-# 1. 核心库与第三方包导入区
-# ==========================================
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles  # 🌟 新增：静态文件服务
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 import jwt
 from datetime import datetime, timedelta, timezone
+import os # 🌟 新增
 
-# ==========================================
-# 2. 数据库与数据模型导入区
-# ==========================================
+# 数据库与模型
 from app.core.database import engine, SessionLocal, Base
 from app.models.user import User
 
-# ==========================================
-# 3. 开机自动建表动作
-# ==========================================
+# 自动建表
 Base.metadata.create_all(bind=engine)
 
-# ==========================================
-# 4. FastAPI 实例与中间件配置
-# ==========================================
-app = FastAPI(
-    title="灵犀智课 API",
-    description="多模态AI互动式教学智能体后端接口",
-    version="1.0.0"
-)
+app = FastAPI(title="灵犀智课 API", version="1.0.0")
 
-# 配置 CORS 跨域中间件 (全量开放，对接前端团队)
+# 跨域配置
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -39,21 +27,19 @@ app.add_middleware(
 )
 
 # ==========================================
-# 5. 安全加密与数据校验配置
+# 🌟 核心新增：挂载本地目录到网络，供 Coze 下载
 # ==========================================
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+os.makedirs("downloads/uploads", exist_ok=True)
+os.makedirs("downloads/exports", exist_ok=True)
+app.mount("/static", StaticFiles(directory="downloads"), name="static")
 
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = "lingxi_super_secret_key_2026"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
 
-class UserRegister(BaseModel):
-    username: str
-    password: str
-
-
-class UserLogin(BaseModel):
+class UserAuth(BaseModel):
     username: str
     password: str
 
@@ -66,66 +52,36 @@ def get_db():
         db.close()
 
 
-# ==========================================
-# 6. 核心业务接口路由区
-# ==========================================
-
-@app.get("/", summary="系统状态检查")
+@app.get("/")
 def root():
-    return {
-        "message": "Hello, 灵犀智课后端已成功启动！",
-        "status": "online"
-    }
+    return {"message": "灵犀智课后端服务运行中", "status": "online"}
 
 
-@app.post("/api/users/register", summary="教师账号注册")
-def register_user(user_data: UserRegister, db: Session = Depends(get_db)):
-    try:
-        existing_user = db.query(User).filter(User.username == user_data.username).first()
-        if existing_user:
-            raise HTTPException(status_code=400, detail="该用户名已被注册，请换一个")
-
-        hashed_pwd = pwd_context.hash(user_data.password)
-        new_user = User(username=user_data.username, hashed_password=hashed_pwd)
-
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-
-        return {
-            "message": "恭喜！教师账号注册成功",
-            "user_id": new_user.id,
-            "username": new_user.username
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"数据库操作崩溃: {str(e)}")
+@app.post("/api/users/register")
+def register(user_data: UserAuth, db: Session = Depends(get_db)):
+    if db.query(User).filter(User.username == user_data.username).first():
+        raise HTTPException(status_code=400, detail="用户名已存在")
+    hashed_pwd = pwd_context.hash(user_data.password)
+    new_user = User(username=user_data.username, hashed_password=hashed_pwd)
+    db.add(new_user)
+    db.commit()
+    return {"message": "注册成功"}
 
 
-@app.post("/api/users/login", summary="教师账号登录")
-def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
+@app.post("/api/users/login")
+def login(login_data: UserAuth, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == login_data.username).first()
-
     if not user or not pwd_context.verify(login_data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="用户名或密码错误")
+        raise HTTPException(status_code=401, detail="账号或密码错误")
 
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode = {"sub": user.username, "user_id": user.id, "exp": expire}
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=1440)
+    token = jwt.encode({"sub": user.username, "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
+    return {"access_token": token, "token_type": "bearer", "username": user.username}
 
-    return {
-        "message": "登录成功，欢迎回来！",
-        "access_token": encoded_jwt,
-        "token_type": "bearer",
-        "user_id": user.id,
-        "username": user.username
-    }
-
-
-# ==========================================
-# 7. 接入 Coze 专属插件路由
-# ==========================================
+# 1. 引入原有的 Coze 插件路由
 from app.routers import coze_plugins
-
 app.include_router(coze_plugins.router)
+
+# 2. 引入新增的 Word 插件路由 (这一步很关键！)
+from app.routers import word_plugins
+app.include_router(word_plugins.router)

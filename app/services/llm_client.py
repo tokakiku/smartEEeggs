@@ -1,126 +1,105 @@
 # ==========================================
-# 灵犀智课 - LLM 大模型驱动引擎 (智谱 GLM-4)
-# 文件路径: app/services/llm_client.py
+# 灵犀智课 - 核心 LLM 大脑 (ZhipuAI 旗舰版 - 命题扣题版)
+# 特性：接入 GLM-4-Plus | 强制输出教学方法、活动设计与作业
 # ==========================================
 
+import os
+import re
 import json
+import logging
 from zhipuai import ZhipuAI
+from dotenv import load_dotenv
 
-# 注入你的超级引擎钥匙
-ZHIPU_API_KEY = "b2918f0171804e7cab964c4276bbd669.pqKTd3tMs7KszsEV"
+load_dotenv()
+logger = logging.getLogger("LLM_Client")
+
+ZHIPU_API_KEY = os.getenv("ZHIPU_API_KEY")
+if not ZHIPU_API_KEY:
+    logger.warning("🚨 警告：未找到 ZHIPU_API_KEY，请检查 .env 文件！")
+
 client = ZhipuAI(api_key=ZHIPU_API_KEY)
 
+def extract_json_from_text(text: str) -> dict:
+    try:
+        text = text.strip().strip("```json").strip("```").strip()
+        return json.loads(text)
+    except json.JSONDecodeError:
+        logger.warning("⚠️ 直接解析 JSON 失败，尝试正则暴力抠取...")
+        match = re.search(r'\{.*\}', text, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except Exception as e:
+                logger.error(f"❌ 正则解析依然失败: {e}")
+                raise ValueError("大模型返回的内容无法解析为有效 JSON")
+        raise ValueError("大模型未返回 JSON 格式数据")
 
 def generate_outline_from_text(course_topic: str, extracted_text: str) -> dict:
+    logger.info(f"🧠 [Zhipu 引擎] 正在为主题《{course_topic}》生成命题标准施工图...")
+
+    # 🌟 终极优化 Prompt：严格扣紧“目标、过程、方法、活动设计、作业”五大命题要求，并加入互动游戏！
+    prompt = f"""你是一位顶级的教育架构师。请根据以下[参考资料]，为主题《{course_topic}》生成一份符合 BOPPPS 教学模型，且严格满足命题格式要求的课件大纲 JSON。
+
+    【核心指令与规范】
+    1. 必须输出名为 "outline_data" 的 JSON 对象。
+    2. "course_metadata" 中必须包含以下字段：
+       - "teaching_methods": 数组格式，列出本课使用的主要教学方法（如讲授法、任务驱动法等）。
+       - "homework": 字符串格式，为本节课设计的具体课后作业任务。
+    3. "syllabus_content" 是代表教学过程的数组。`stage` 必须使用 "B (Bridge-in) - 导入" 等 6 个固定标识。
+    4. 在每个环节的内部描述或知识点中，必须体现具体的“课堂活动设计”（如：小组讨论、案例分析、角色扮演等）。
+    5. 互动游戏生成规则：为了增强课堂趣味性，请你根据教学内容，在合适的环节（如 P2 或 P3）中插入一个互动游戏。
+    在该环节的 JSON 对象中新增一个 "interactive_game" 字段。游戏类型必须从以下三种中**随机选择最合适的一种**：
+
+      - 类型 1：知识消消乐 (memory_match)。适用于概念匹配。
+        格式要求：{{"game_type": "memory_match", "pairs": [{{"left": "概念1", "right": "解释1"}}, {{"left": "概念2", "right": "解释2"}}]}} (需提供 4 对)
+
+      - 类型 2：概念分类 (drag_sort)。适用于归纳分类。
+        格式要求：{{"game_type": "drag_sort", "categories": ["类别A", "类别B"], "items": [{{"word": "词条1", "target": "类别A"}}, {{"word": "词条2", "target": "类别B"}}]}} (需提供 6 个词条)
+
+      - 类型 3：情景闯关 (scenario_quiz)。适用于逻辑推理或选择。
+        格式要求：{{"game_type": "scenario_quiz", "questions": [{{"scenario": "情景描述和问题", "options": ["选项A", "选项B", "选项C"], "correct_index": 1}}]}} (需提供 3 个问题)
+
+    【期望的 JSON 格式示例】
+    {{
+      "outline_data": {{
+        "course_metadata": {{
+          "title": "...",
+          "target_audience": "...",
+          "teaching_objectives": ["...", "..."],
+          "difficulty_level": "...",
+          "total_duration": 45,
+          "teaching_methods": ["案例分析法", "启发式提问", "小组合作探究"],
+          "homework": "请结合今天所学内容，完成一份关于...的实践报告，不少于500字。"
+        }},
+        "syllabus_content": [
+          {{
+            "stage": "B (Bridge-in) - 导入",
+            "content_description": "【活动设计：视频赏析】播放一段...视频，提出核心问题...",
+            "duration": 5,
+            "interaction_type": "观看与问答"
+          }}
+        ]
+      }}
+    }}
+
+    [参考资料开始]
+    {extracted_text}
+    [参考资料结束]
+
+    请直接输出 JSON 结果：
     """
-    根据组长 ljy 的最新 BOPPPS 标准 Schema，
-    将枯燥的 PDF 纯文本转化为结构化的教学大纲 JSON。
-    """
-    print(f"🧠 [大模型引擎] 正在呼叫智谱 GLM-4 提炼《{course_topic}》的大纲...")
-
-    # 核心改造：完全替换为 ljy 提供的完整版 BOPPPS 模板
-    system_prompt = """
-    你是一位资深的教育教学专家，精通 BOPPPS 教学模型。
-    请根据我提供的【参考资料内容】，提取核心知识点，并自动生成一份结构化的教学大纲。
-
-    【重要指令】
-    必须严格按照以下 JSON Schema 输出，绝对不要包含任何额外的 Markdown 标记（如 ```json）或解释性文字，只能输出纯 JSON 字符串。
-    你需要根据资料内容，智能填充以下所有字段（如果没有对应的素材资源，resource_pool 和 resource_refs 暂时置空或填空数组）：
-
-    {
-      "course_metadata": {
-        "title": "课程标题",
-        "target_audience": "目标学生群体（根据资料推测）",
-        "teaching_objectives": ["目标1: 知识维度", "目标2: 能力维度", "目标3: 素养维度"],
-        "difficulty_level": "难度系数（如：初级/中级/高级）",
-        "total_duration": 45
-      },
-      "syllabus_content": [
-        {
-          "stage": "B (Bridge-in) - 导入",
-          "content_description": "设计具体的导入情境或问题",
-          "duration": 5,
-          "interaction_type": "Q&A / 视频观察",
-          "resource_refs": []
-        },
-        {
-          "stage": "O (Objective) - 目标",
-          "content_description": "本节课学习后学生应达到的具体指标",
-          "duration": 2,
-          "interaction_type": "展示",
-          "resource_refs": []
-        },
-        {
-          "stage": "P1 (Pre-assessment) - 前测",
-          "content_description": "设计检测学生既有知识储备的问题",
-          "duration": 5,
-          "interaction_type": "匿名答疑墙 / 快速投票",
-          "resource_refs": []
-        },
-        {
-          "stage": "P2 (Participatory Learning) - 参与式学习",
-          "core_knowledge_points": [
-            {
-              "point": "提取的核心知识点1",
-              "is_key_point": true,
-              "is_difficult_point": false,
-              "explanation": "详细讲解逻辑",
-              "game_hook": null
-            }
-          ],
-          "duration": 25,
-          "interaction_type": "讲授与互动",
-          "resource_refs": []
-        },
-        {
-          "stage": "P3 (Post-assessment) - 后测",
-          "content_description": "设计课堂效果检测习题或任务",
-          "duration": 5,
-          "interaction_type": "在线测试",
-          "resource_refs": []
-        },
-        {
-          "stage": "S (Summary) - 总结",
-          "content_description": "知识点梳理与思维导图生成",
-          "duration": 3,
-          "interaction_type": "思维导图展示",
-          "resource_refs": []
-        }
-      ],
-      "resource_pool": []
-    }
-    """
-
-    user_prompt = f"【课程主题】{course_topic}\n\n【参考资料内容】\n{extracted_text}"
 
     try:
         response = client.chat.completions.create(
-            model="glm-4-flash",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.2,
+            model="glm-4-plus",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            top_p=0.9
         )
-
-        llm_output = response.choices[0].message.content.strip()
-
-        # 脱掉 Markdown 外衣
-        if llm_output.startswith("```json"):
-            llm_output = llm_output.replace("```json", "", 1)
-        if llm_output.endswith("```"):
-            llm_output = llm_output.rsplit("```", 1)[0]
-
-        llm_output = llm_output.strip()
-
-        outline_dict = json.loads(llm_output)
-        print("✅ [大模型引擎] 奇迹发生！已严格按照组长 ljy 的 BOPPPS 模板生成大纲！")
-        return outline_dict
-
-    except json.JSONDecodeError as e:
-        print(f"❌ [大模型引擎] JSON解析失败: {str(e)}")
-        print(f"模型的原始输出为:\n{llm_output}")
-        return {"error": "JSON解析失败"}
+        raw_text = response.choices[0].message.content
+        parsed_json = extract_json_from_text(raw_text)
+        logger.info("✅ [Zhipu 引擎] 命题标准施工图生成完毕！")
+        return parsed_json
     except Exception as e:
-        print(f"❌ [大模型引擎] 调用失败: {str(e)}")
-        return {"error": str(e)}
+        logger.error(f"❌ [Zhipu 引擎] 大纲生成崩溃: {str(e)}")
+        raise e
