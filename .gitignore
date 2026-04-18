@@ -1,18 +1,45 @@
-# 虚拟环境
+﻿# Python cache/build
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
 .venv/
 venv/
 
-# PyCharm 缓存
+# IDE / OS artifacts
 .idea/
+.DS_Store
 
-# Python 编译文件
-__pycache__/
-*.pyc
-
-# 忽略大型数据文件（视你们团队规定而定，比如之前的 csv）
-*.csv
-#忽略其他人的代码
-backend/
-downloads/
-readme.md
+# Local environment files
 .env
+.env.*
+
+# Local generated artifacts (safe to regenerate)
+downloads/
+backend/downloads/
+backend/data/debug/
+backend/data/test_tmp/
+backend/data/test_outputs/
+backend/data/chunks/
+backend/data/processed/
+backend/data/relations/
+backend/data/structured/
+backend/data/graph/
+backend/data/vector_index/
+backend/data/hybrid_search/
+backend/data/ingest_reports/
+deploy/milvus/volumes/
+pytest-cache-files-*/
+ngrok.exe
+backend/scripts/_archive_tmp/
+
+# Local raw materials are usually large and may contain copyrighted content
+backend/data/raw/
+
+# Optional local exports
+*.csv

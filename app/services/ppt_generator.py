@@ -4,6 +4,7 @@
 # ==========================================
 
 import os
+from pathlib import Path
 from pptx import Presentation
 from pptx.util import Pt
 from pptx.dml.color import RGBColor
@@ -137,16 +138,18 @@ def generate_ppt_from_json(json_data: dict, project_id: int) -> str:
     # ==========================================
     # 5. 物理存储与云端上传
     # ==========================================
-    output_dir = "downloads"
-    os.makedirs(output_dir, exist_ok=True)
-    local_file_path = f"{output_dir}/ppt_project_{project_id}.pptx"
-    prs.save(local_file_path)
+    project_root = Path(__file__).resolve().parents[2]
+    output_dir = project_root / "backend" / "downloads"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    file_name = f"ppt_project_{project_id}.pptx"
+    local_file_path = output_dir / file_name
+    prs.save(str(local_file_path))
     print(f"💾 [渲染引擎] 本地文件已生成: {local_file_path}")
 
     object_name = f"ppt_{project_id}.pptx"
-    cloud_url = upload_ppt_to_minio(local_file_path, object_name)
+    cloud_url = upload_ppt_to_minio(str(local_file_path), object_name)
 
     if cloud_url:
         return cloud_url
     else:
-        return local_file_path
+        return f"/downloads/{file_name}"

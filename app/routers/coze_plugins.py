@@ -7,6 +7,7 @@ import os
 import json
 import asyncio
 import shutil
+from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, Body, UploadFile, File
 from pydantic import BaseModel, Field
 from typing import Any
@@ -18,7 +19,8 @@ from app.services.ppt_generator import generate_ppt_from_json
 
 router = APIRouter(prefix="/api/plugins", tags=["Coze 专属对接插件"])
 
-UPLOAD_DIR = "downloads/uploads"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+UPLOAD_DIR = str(PROJECT_ROOT / "backend" / "downloads" / "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
