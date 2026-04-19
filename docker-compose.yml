@@ -38,6 +38,11 @@ services:
     volumes:
       - minio_data:/data
 
+  # 注：
+  # Milvus 向量数据库采用轻量级 Milvus Lite 方案集成在 Python 后端进程中。
+  # 运行时直接操作本地 ./milvus_ruijie.db 文件，实现免 Docker 化极速检索。
+  # 生产环境下可通过修改连接字符串，无缝平滑切回 Milvus Server / Zilliz Cloud 集群。
+
 volumes:
   mysql_data:
   redis_data:

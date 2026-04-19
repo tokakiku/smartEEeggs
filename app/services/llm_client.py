@@ -1,6 +1,6 @@
 # ==========================================
-# 灵犀智课 - 核心 LLM 大脑 (ZhipuAI 旗舰版 - 命题扣题版)
-# 特性：接入 GLM-4-Plus | 强制输出教学方法、活动设计与作业
+# 灵犀智课 - 核心 LLM 大脑 (Zilliz Cloud 混合检索安全版)
+# 特性：接入 GLM-4-Plus | 云端向量库安全调用 | 双路召回 RAG 融合
 # ==========================================
 
 import os
@@ -8,83 +8,129 @@ import re
 import json
 import logging
 from zhipuai import ZhipuAI
+from pymilvus import MilvusClient
 from dotenv import load_dotenv
 
+# 加载 .env 配置文件
 load_dotenv()
 logger = logging.getLogger("LLM_Client")
 
+# 智谱 AI 配置
 ZHIPU_API_KEY = os.getenv("ZHIPU_API_KEY")
 if not ZHIPU_API_KEY:
     logger.warning("🚨 警告：未找到 ZHIPU_API_KEY，请检查 .env 文件！")
 
 client = ZhipuAI(api_key=ZHIPU_API_KEY)
 
+# ==========================================
+# 🌟 安全读取 Zilliz Cloud (云端 Milvus) 配置
+# ==========================================
+ZILLIZ_URI = os.getenv("ZILLIZ_URI")
+ZILLIZ_TOKEN = os.getenv("ZILLIZ_TOKEN")
+COLLECTION_NAME = "lingxi_knowledge_base"
+
+# 安全初始化云端客户端
+if ZILLIZ_URI and ZILLIZ_TOKEN:
+    try:
+        # 连接云端向量引擎，取代本地 .db 文件
+        milvus_client = MilvusClient(uri=ZILLIZ_URI, token=ZILLIZ_TOKEN)
+        logger.info("✅ 已安全连接 Zilliz Cloud 云端向量库")
+    except Exception as e:
+        logger.error(f"❌ 连接 Zilliz 失败: {e}")
+        milvus_client = None
+else:
+    logger.warning("⚠️ 未在 .env 中配置 ZILLIZ 信息，系统将降级为纯外部语料依赖。")
+    milvus_client = None
+
+
 def extract_json_from_text(text: str) -> dict:
+    """
+    从大模型返回的文本中提取并解析 JSON 对象
+    """
     try:
         text = text.strip().strip("```json").strip("```").strip()
         return json.loads(text)
     except json.JSONDecodeError:
-        logger.warning("⚠️ 直接解析 JSON 失败，尝试正则暴力抠取...")
+        logger.warning("⚠️ 直接解析 JSON 失败，尝试正则提取...")
         match = re.search(r'\{.*\}', text, re.DOTALL)
         if match:
             try:
                 return json.loads(match.group(0))
             except Exception as e:
                 logger.error(f"❌ 正则解析依然失败: {e}")
-                raise ValueError("大模型返回的内容无法解析为有效 JSON")
-        raise ValueError("大模型未返回 JSON 格式数据")
+                raise ValueError("内容无法解析为有效 JSON")
+        raise ValueError("未返回 JSON 格式数据")
+
+
+def search_cloud_knowledge(query: str, top_k: int = 3) -> str:
+    """
+    从 Zilliz Cloud 云端召回最相关的知识片段
+    """
+    if not milvus_client:
+        return ""
+
+    try:
+        # 1. 提问向量化
+        query_vector = client.embeddings.create(
+            model="embedding-2",
+            input=query,
+        ).data[0].embedding
+
+        # 2. 云端相似度检索
+        search_res = milvus_client.search(
+            collection_name=COLLECTION_NAME,
+            data=[query_vector],
+            limit=top_k,
+            output_fields=["text", "source"]
+        )
+
+        # 3. 拼接检索到的证据
+        retrieved_texts = []
+        for hits in search_res:
+            for hit in hits:
+                source = hit["entity"].get("source", "云端知识库")
+                text_content = hit["entity"].get("text", "")
+                retrieved_texts.append(f"【来源: {source}】\n{text_content}")
+
+        if retrieved_texts:
+            logger.info(f"✅ 成功从 Zilliz Cloud 召回 {len(retrieved_texts)} 条证据")
+        return "\n\n".join(retrieved_texts)
+    except Exception as e:
+        logger.error(f"❌ 云端向量检索失败: {e}")
+        return ""
+
 
 def generate_outline_from_text(course_topic: str, extracted_text: str) -> dict:
+    """
+    结合云端检索证据与外部提取文本，生成标准 BOPPPS 课件大纲
+    """
     logger.info(f"🧠 [Zhipu 引擎] 正在为主题《{course_topic}》生成命题标准施工图...")
 
-    # 🌟 终极优化 Prompt：严格扣紧“目标、过程、方法、活动设计、作业”五大命题要求，并加入互动游戏！
-    prompt = f"""你是一位顶级的教育架构师。请根据以下[参考资料]，为主题《{course_topic}》生成一份符合 BOPPPS 教学模型，且严格满足命题格式要求的课件大纲 JSON。
+    # 🚀 双路召回融合：云端检索 + 插件提取
+    cloud_evidence = search_cloud_knowledge(course_topic, top_k=3)
+
+    combined_evidence = ""
+    if extracted_text:
+        combined_evidence += f"【外部资料片段】\n{extracted_text}\n\n"
+    if cloud_evidence:
+        combined_evidence += f"【云端图谱增强知识】\n{cloud_evidence}\n\n"
+
+    prompt = f"""你是一位顶级的教育架构师。请根据以下【知识库检索证据】，为主题《{course_topic}》生成一份符合 BOPPPS 教学模型，且严格满足命题格式要求的课件大纲 JSON。
+
+    【知识库处理原则】
+    1. 必须以检索到的“教材原文/大纲”作为核心知识点依据，绝不可胡编乱造。
+    2. 将“时事热点”或“优秀资源”作为案例，巧妙融入到“导入(Bridge-in)”或“参与式学习(Participatory Learning)”环节中。
 
     【核心指令与规范】
     1. 必须输出名为 "outline_data" 的 JSON 对象。
-    2. "course_metadata" 中必须包含以下字段：
-       - "teaching_methods": 数组格式，列出本课使用的主要教学方法（如讲授法、任务驱动法等）。
-       - "homework": 字符串格式，为本节课设计的具体课后作业任务。
-    3. "syllabus_content" 是代表教学过程的数组。`stage` 必须使用 "B (Bridge-in) - 导入" 等 6 个固定标识。
-    4. 在每个环节的内部描述或知识点中，必须体现具体的“课堂活动设计”（如：小组讨论、案例分析、角色扮演等）。
-    5. 互动游戏生成规则：为了增强课堂趣味性，请你根据教学内容，在合适的环节（如 P2 或 P3）中插入一个互动游戏。
-    在该环节的 JSON 对象中新增一个 "interactive_game" 字段。游戏类型必须从以下三种中**随机选择最合适的一种**：
+    2. "course_metadata" 必须包含: "teaching_methods" 数组和 "homework" 字符串。
+    3. "syllabus_content" 必须遵循 BOPPPS 的 6 个阶段。
+    4. 互动游戏规则：在 P2 或 P3 环节插入字段 "interactive_game"。
+       可选类型：memory_match, drag_sort, scenario_quiz。
 
-      - 类型 1：知识消消乐 (memory_match)。适用于概念匹配。
-        格式要求：{{"game_type": "memory_match", "pairs": [{{"left": "概念1", "right": "解释1"}}, {{"left": "概念2", "right": "解释2"}}]}} (需提供 4 对)
-
-      - 类型 2：概念分类 (drag_sort)。适用于归纳分类。
-        格式要求：{{"game_type": "drag_sort", "categories": ["类别A", "类别B"], "items": [{{"word": "词条1", "target": "类别A"}}, {{"word": "词条2", "target": "类别B"}}]}} (需提供 6 个词条)
-
-      - 类型 3：情景闯关 (scenario_quiz)。适用于逻辑推理或选择。
-        格式要求：{{"game_type": "scenario_quiz", "questions": [{{"scenario": "情景描述和问题", "options": ["选项A", "选项B", "选项C"], "correct_index": 1}}]}} (需提供 3 个问题)
-
-    【期望的 JSON 格式示例】
-    {{
-      "outline_data": {{
-        "course_metadata": {{
-          "title": "...",
-          "target_audience": "...",
-          "teaching_objectives": ["...", "..."],
-          "difficulty_level": "...",
-          "total_duration": 45,
-          "teaching_methods": ["案例分析法", "启发式提问", "小组合作探究"],
-          "homework": "请结合今天所学内容，完成一份关于...的实践报告，不少于500字。"
-        }},
-        "syllabus_content": [
-          {{
-            "stage": "B (Bridge-in) - 导入",
-            "content_description": "【活动设计：视频赏析】播放一段...视频，提出核心问题...",
-            "duration": 5,
-            "interaction_type": "观看与问答"
-          }}
-        ]
-      }}
-    }}
-
-    [参考资料开始]
-    {extracted_text}
-    [参考资料结束]
+    【知识库检索证据开始】
+    {combined_evidence}
+    【知识库检索证据结束】
 
     请直接输出 JSON 结果：
     """
@@ -93,7 +139,7 @@ def generate_outline_from_text(course_topic: str, extracted_text: str) -> dict:
         response = client.chat.completions.create(
             model="glm-4-plus",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
+            temperature=0.6,
             top_p=0.9
         )
         raw_text = response.choices[0].message.content
